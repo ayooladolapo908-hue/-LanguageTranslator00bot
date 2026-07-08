@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
@@ -12,15 +12,12 @@ from telegram.ext import (
     filters
 )
 from deep_translator import GoogleTranslator
-from datetime import datetime
 
-# Configure logging for Railway
+# Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
 
@@ -30,74 +27,27 @@ if not TOKEN:
     logger.error("TELEGRAM_TOKEN environment variable not set!")
     sys.exit(1)
 
-PORT = int(os.environ.get('PORT', 8443))
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'production')
 
 # Language database
 LANGUAGES: Dict[str, str] = {
-    'en': 'English',
-    'hi': 'Hindi',
-    'es': 'Spanish',
-    'fr': 'French',
-    'de': 'German',
-    'zh': 'Chinese (Simplified)',
-    'zh-TW': 'Chinese (Traditional)',
-    'ar': 'Arabic',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-    'ru': 'Russian',
-    'pt': 'Portuguese',
-    'it': 'Italian',
-    'nl': 'Dutch',
-    'bn': 'Bengali',
-    'ta': 'Tamil',
-    'te': 'Telugu',
-    'ur': 'Urdu',
-    'pa': 'Punjabi',
-    'mr': 'Marathi',
-    'gu': 'Gujarati',
-    'kn': 'Kannada',
-    'ml': 'Malayalam',
-    'tr': 'Turkish',
-    'vi': 'Vietnamese',
-    'th': 'Thai',
-    'id': 'Indonesian',
-    'pl': 'Polish',
-    'uk': 'Ukrainian',
-    'ro': 'Romanian'
+    'en': 'English', 'hi': 'Hindi', 'es': 'Spanish', 'fr': 'French',
+    'de': 'German', 'zh': 'Chinese', 'ar': 'Arabic', 'ja': 'Japanese',
+    'ko': 'Korean', 'ru': 'Russian', 'pt': 'Portuguese', 'it': 'Italian',
+    'nl': 'Dutch', 'bn': 'Bengali', 'ta': 'Tamil', 'te': 'Telugu',
+    'ur': 'Urdu', 'pa': 'Punjabi', 'mr': 'Marathi', 'gu': 'Gujarati',
+    'kn': 'Kannada', 'ml': 'Malayalam', 'tr': 'Turkish', 'vi': 'Vietnamese',
+    'th': 'Thai', 'id': 'Indonesian', 'pl': 'Polish', 'uk': 'Ukrainian',
+    'ro': 'Romanian', 'el': 'Greek', 'he': 'Hebrew', 'sv': 'Swedish',
+    'da': 'Danish', 'fi': 'Finnish', 'no': 'Norwegian', 'cs': 'Czech'
 }
 
-# User preferences storage (in-memory - for production use Redis/PostgreSQL)
+# User preferences storage
 user_preferences: Dict[int, str] = {}
 user_history: Dict[int, list] = {}
 
 # Initialize translator
 translator = GoogleTranslator()
-
-# ==================== Helper Functions ====================
-
-def get_language_name(lang_code: str) -> str:
-    """Get language name from code."""
-    return LANGUAGES.get(lang_code, lang_code)
-
-def detect_language(text: str) -> str:
-    """Detect language of text."""
-    try:
-        return translator.detect(text)
-    except:
-        return 'en'
-
-def translate_text(text: str, target_lang: str = 'en') -> Optional[str]:
-    """Translate text to target language."""
-    try:
-        source_lang = detect_language(text)
-        if source_lang == target_lang:
-            return text
-        translated = GoogleTranslator(source='auto', target=target_lang).translate(text)
-        return translated
-    except Exception as e:
-        logger.error(f"Translation error: {e}")
-        return None
 
 def create_main_keyboard() -> InlineKeyboardMarkup:
     """Create main keyboard with buttons."""
@@ -114,30 +64,26 @@ def create_main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 def create_language_keyboard() -> InlineKeyboardMarkup:
-    """Create language selection keyboard with pagination."""
+    """Create language selection keyboard."""
     lang_buttons = []
     row = []
     
-    # Sort languages alphabetically
     sorted_langs = sorted(LANGUAGES.items(), key=lambda x: x[1])
     
     for i, (code, name) in enumerate(sorted_langs, 1):
         row.append(InlineKeyboardButton(name, callback_data=f'set_lang_{code}'))
-        if len(row) == 3:  # 3 buttons per row for better mobile view
+        if len(row) == 3:
             lang_buttons.append(row)
             row = []
     
     if row:
         lang_buttons.append(row)
     
-    # Add navigation buttons
     lang_buttons.append([
         InlineKeyboardButton("🔙 Back to Main", callback_data='back_to_main')
     ])
     
     return InlineKeyboardMarkup(lang_buttons)
-
-# ==================== Command Handlers ====================
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command."""
@@ -145,10 +91,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     welcome_message = f"""
 🌟 **Welcome {user.first_name}!** 
 
-I'm your advanced Language Translator Bot powered by Google Translate.
+I'm your Language Translator Bot powered by Google Translate.
 
 **✨ Features:**
-• Translate between 30+ languages
+• Translate between 35+ languages
 • Auto-detect source language
 • Smart language preferences
 • Translation history
@@ -163,12 +109,10 @@ I'm your advanced Language Translator Bot powered by Google Translate.
 **💡 Try it now!** 
 Send me any text and watch it translate instantly! 🚀
 """
-    
-    keyboard = create_main_keyboard()
     await update.message.reply_text(
         welcome_message,
         parse_mode='Markdown',
-        reply_markup=keyboard
+        reply_markup=create_main_keyboard()
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -177,18 +121,18 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 🤖 **Language Translator Bot - Help Guide**
 
 **📋 Available Commands:**
-• `/start` - Show welcome message
-• `/help` - Display this help guide
-• `/languages` - List all supported languages
-• `/language [code]` - Set your preferred language
+• `/start` - Welcome message
+• `/help` - Display this help
+• `/languages` - List all languages
+• `/language [code]` - Set preferred language
 • `/translate [code] [text]` - Translate specific text
 
 **🔍 How to Use:**
 1. **Auto-translate:** Just send me any text
-2. **Set Language:** Use `/language es` for Spanish
+2. **Set Language:** `/language es` for Spanish
 3. **Specific Translation:** `/translate fr Hello world`
 
-**🌍 Language Codes:**
+**🌍 Popular Language Codes:**
 `en`-English, `es`-Spanish, `fr`-French, `de`-German
 `hi`-Hindi, `zh`-Chinese, `ar`-Arabic, `ja`-Japanese
 
@@ -196,8 +140,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 • Use buttons for easier navigation
 • Your language preference is saved
 • View your translation history
-
-Need more help? Visit our GitHub repository!
 """
     await update.message.reply_text(help_text, parse_mode='Markdown')
 
@@ -274,23 +216,19 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             )
             return
         
-        translated = translate_text(text_to_translate, target_lang)
-        if translated:
-            response = f"""
+        translated = GoogleTranslator(source='auto', target=target_lang).translate(text_to_translate)
+        
+        response = f"""
 ✅ **Translation to {LANGUAGES[target_lang]}**
 
 📝 **Original:** {text_to_translate}
 🌐 **Translated:** {translated}
 """
-            await update.message.reply_text(response, parse_mode='Markdown')
-        else:
-            await update.message.reply_text("❌ Translation failed. Please try again.")
+        await update.message.reply_text(response, parse_mode='Markdown')
             
     except Exception as e:
         logger.error(f"Translate command error: {e}")
         await update.message.reply_text("❌ Translation failed. Please try again.")
-
-# ==================== Message Handler ====================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle incoming text messages."""
@@ -298,76 +236,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         text = update.message.text
         user_id = update.effective_user.id
         
-        # Skip commands
         if text.startswith('/'):
             return
         
-        # Send typing indicator
         await update.message.chat.send_action(action="typing")
         
-        # Get user's preferred language
         target_lang = user_preferences.get(user_id, 'en')
         
-        # Detect source language
-        source_lang = detect_language(text)
-        source_lang_name = get_language_name(source_lang)
-        
-        # Translate
-        translated = translate_text(text, target_lang)
+        translated = GoogleTranslator(source='auto', target=target_lang).translate(text)
         
         if not translated:
             await update.message.reply_text(
-                "❌ Sorry, I couldn't translate that. Please try again with shorter text."
+                "❌ Sorry, I couldn't translate that. Please try again."
             )
             return
         
-        # Save to history
-        if user_id not in user_history:
-            user_history[user_id] = []
-        user_history[user_id].append({
-            'original': text,
-            'translated': translated,
-            'source_lang': source_lang,
-            'target_lang': target_lang,
-            'timestamp': datetime.now().isoformat()
-        })
-        # Keep only last 50 entries
-        if len(user_history[user_id]) > 50:
-            user_history[user_id] = user_history[user_id][-50:]
-        
-        # Prepare response
-        if source_lang == target_lang:
-            response = f"""
-ℹ️ **Text already in {LANGUAGES[target_lang]}**
+        response = f"""
+✅ **Translation**
 
-📝 **Message:** {text}
-
-💡 To translate to another language, use:
-`/language [code]` to change your preference
-`/translate [code] [text]` for specific translations
-"""
-        else:
-            response = f"""
-✅ **Translation Complete**
-
-📝 **Original ({source_lang_name}):** {text}
+📝 **Original:** {text}
 🌐 **Translated ({LANGUAGES[target_lang]}):** {translated}
 """
         
-        keyboard = create_main_keyboard()
         await update.message.reply_text(
             response,
             parse_mode='Markdown',
-            reply_markup=keyboard
+            reply_markup=create_main_keyboard()
         )
         
     except Exception as e:
         logger.error(f"Message handling error: {e}")
         await update.message.reply_text(
-            "⚠️ An error occurred while processing your message. Please try again."
+            "⚠️ An error occurred. Please try again."
         )
-
-# ==================== Callback Query Handler ====================
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle button callbacks."""
@@ -376,12 +277,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     try:
         if query.data == 'change_lang':
-            keyboard = create_language_keyboard()
             await query.edit_message_text(
                 "🌍 **Select your preferred language:**\n\n"
                 "Choose a language for all future translations:",
                 parse_mode='Markdown',
-                reply_markup=keyboard
+                reply_markup=create_language_keyboard()
             )
         
         elif query.data.startswith('set_lang_'):
@@ -410,12 +310,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 )
                 return
             
-            # Show last 5 translations
-            recent = history[-5:][::-1]  # Reverse to show latest first
+            recent = history[-5:][::-1]
             history_text = "\n\n".join([
                 f"**{i+1}.** {entry['original'][:50]}...\n"
-                f"➜ {entry['translated'][:50]}...\n"
-                f"_From {get_language_name(entry['source_lang'])} to {get_language_name(entry['target_lang'])}_"
+                f"➜ {entry['translated'][:50]}..."
                 for i, entry in enumerate(recent)
             ])
             
@@ -453,14 +351,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 **Hosted on:** Railway
 
 **Features:**
-• 30+ languages
+• 35+ languages
 • Auto-detection
 • Smart preferences
 • Translation history
 • Button-based interface
-
-**Source Code:** GitHub
-**Developer:** @yourusername
 """
             await query.edit_message_text(
                 about_text,
@@ -483,8 +378,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reply_markup=create_main_keyboard()
         )
 
-# ==================== Error Handler ====================
-
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors gracefully."""
     logger.error(f"Update {update} caused error: {context.error}")
@@ -494,16 +387,14 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             "⚠️ An unexpected error occurred. Please try again later."
         )
 
-# ==================== Main Function ====================
-
 def main() -> None:
     """Start the bot."""
     logger.info("Starting Language Translator Bot...")
     logger.info(f"Environment: {ENVIRONMENT}")
     logger.info(f"Bot token: {'*' * 10}{TOKEN[-4:]}")
     
-    # Build application
-    application = ApplicationBuilder().token(TOKEN).build()
+    # Build application with new version
+    application = Application.builder().token(TOKEN).build()
     
     # Add command handlers
     application.add_handler(CommandHandler('start', start_command))
@@ -512,7 +403,7 @@ def main() -> None:
     application.add_handler(CommandHandler('language', language_command))
     application.add_handler(CommandHandler('translate', translate_command))
     
-    # Add message handler for text messages
+    # Add message handler
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
         handle_message
@@ -525,12 +416,8 @@ def main() -> None:
     application.add_error_handler(error_handler)
     
     # Start the bot
-    if ENVIRONMENT == 'production':
-        logger.info("Starting bot in production mode...")
-        application.run_polling()
-    else:
-        logger.info("Starting bot in development mode...")
-        application.run_polling()
+    logger.info("Starting bot with long polling...")
+    application.run_polling()
     
     logger.info("Bot stopped.")
 
