@@ -1,0 +1,3 @@
+# In your project directory, create requirements.txt
+echo "python-telegram-bot==20.7" > requirements.txt
+echo "deep-translator==1.11.4" >> requirements.txt
